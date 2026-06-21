@@ -1,0 +1,10 @@
+# 機密情報が含まれる設定ファイルを除外
+terraform.tfvars
+*.tfvars
+
+# Terraformが実行時に自動生成するローカルデータやプラグインを除外
+.terraform/
+*.tfstate
+*.tfstate.*
+*.json
+my_plan
