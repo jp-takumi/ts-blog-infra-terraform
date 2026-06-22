@@ -51,6 +51,9 @@ resource "aws_subnet" "public_subnet" {
   cidr_block              = "10.0.1.0/24"
   availability_zone       = "ap-northeast-1a"
   map_public_ip_on_launch = true # 起動したインスタンスに自動でパブリックIPを付与するか（true / false)
+  tags = {
+    Name = "public-subnet"
+  }
 }
 
 # ルートテーブル
@@ -81,7 +84,7 @@ resource "aws_route_table_association" "public_assoc" {
 # ==========================================
 # サーバーを置く前に、通す箱（ファイアウォール）や鍵を定義
 
-resource "aws_securtity_group" "web_sg" {
+resource "aws_security_group" "web_sg" {
   name        = "my-ts-blog-ts"
   description = "Allow SSH from my IP and HTTP from world"
   vpc_id      = aws_vpc.my_vpc.id
@@ -90,15 +93,15 @@ resource "aws_securtity_group" "web_sg" {
   ingress {
     from_port   = 22
     to_port     = 22
-    protcol     = "tcp"
-    cidr_blocks = my_cidr
+    protocol    = "tcp"
+    cidr_blocks = [var.my_cidr]
   }
   # インバウンド制御:HTTP
   ingress {
     from_port   = 80
     to_port     = 80
-    protcol     = "tcp"
-    cidr_blocks = "0.0.0.0/0"
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   # アウトバウンド
@@ -106,7 +109,7 @@ resource "aws_securtity_group" "web_sg" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
-    cidr_blocks = "0.0.0.0/0"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
