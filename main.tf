@@ -147,15 +147,18 @@ resource "aws_ssm_parameter" "secret_key" {
 # ==========================================
 # 最後に、ネットワークとセキュリティの中に「中身」を配置
 
-# 最新の Ubuntu 24.04 LTS (ARM64) のAMI IDをAWSから動的に取得する
-data "aws_ssm_parameter" "ubuntu_arm64_ami" {
-  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id"
+# t3 (Intel系) を使う場合のAMI取得コード
+data "aws_ssm_parameter" "ubuntu_amd64_ami" {
+  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
 resource "aws_instance" "web_server" {
-  ami           = data.aws_ssm_parameter.ubuntu_arm64_ami.value
-  instance_type = "t4g.small"
+  ami           = data.aws_ssm_parameter.ubuntu_amd64_ami.value
+  instance_type = "t3.micro"
 
+  credit_specification {
+    cpu_credits = "standard"
+  }
   key_name = aws_key_pair.my_key_pair.key_name
 
   subnet_id              = aws_subnet.public_subnet.id
