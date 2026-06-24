@@ -8,3 +8,5 @@ terraform.tfvars
 *.tfstate.*
 *.json
 my_plan
+*.pem
+*.sh

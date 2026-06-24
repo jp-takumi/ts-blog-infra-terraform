@@ -16,10 +16,18 @@
 # 1. 前提設定（グローバル）
 # ==========================================
 # 最初に「どこのクラウドの、どのリージョンか」を明確にする
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 6.0"
+    }
+  }
+}
+
 provider "aws" {
   region = "ap-northeast-1"
 }
-
 # ==========================================
 # 2. ネットワークインフラ（土台・外枠）
 # ==========================================
@@ -105,7 +113,7 @@ resource "aws_security_group" "web_sg" {
   }
 
   # アウトバウンド
-  ingress {
+  egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -117,10 +125,61 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
+# キーペアの作成とSSMへの保存
+resource "tls_private_key" "my_key" {
+  algorithm = "RSA"
+  rsa_bits  = 2048
+}
+
+resource "aws_key_pair" "my_key_pair" {
+  key_name   = var.key_name
+  public_key = tls_private_key.my_key.public_key_openssh
+}
+
+resource "aws_ssm_parameter" "secret_key" {
+  name  = "/ec2/keypair/${aws_key_pair.my_key_pair.key_pair_id}"
+  type  = "SecureString"
+  value = tls_private_key.my_key.private_key_pem
+}
+
 # ==========================================
 # 4. コンピューティング・ストレージ（実体）
 # ==========================================
 # 最後に、ネットワークとセキュリティの中に「中身」を配置
+
+# 最新の Ubuntu 24.04 LTS (ARM64) のAMI IDをAWSから動的に取得する
+data "aws_ssm_parameter" "ubuntu_arm64_ami" {
+  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/arm64/hvm/ebs-gp3/ami-id"
+}
+
+resource "aws_instance" "web_server" {
+  ami           = data.aws_ssm_parameter.ubuntu_arm64_ami.value
+  instance_type = "t4g.small"
+
+  key_name = aws_key_pair.my_key_pair.key_name
+
+  subnet_id              = aws_subnet.public_subnet.id
+  vpc_security_group_ids = [aws_security_group.web_sg.id]
+
+  user_data = <<-EOF
+  #!/bin/bash
+  apt-get update -y
+  apt-get install -y apache2
+  systemctl start apache2
+  systemctl enable apache2
+  echo "<h1>Hello from Apache on EC2!</h1>" > /var/www/html/index.html
+  EOF
+
+  tags = {
+    Name = "Apache-Server"
+  }
+}
+
+output "ec2_public_ip" {
+  value       = aws_instance.web_server.public_ip
+  description = "The public IP address of the EC2 instance"
+}
+
 
 # ==========================================
 # 5. その他・運用系（周辺リソース）
